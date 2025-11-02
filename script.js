@@ -110,7 +110,6 @@ function exportData() {
   link.download = "budget_backup.json";
   link.click();
 }
-
 // Import JSON
 function importData() {
   const input = document.createElement("input");
@@ -119,13 +118,30 @@ function importData() {
   input.onchange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        data = JSON.parse(event.target.result);
-        saveData();
-      } catch {
-        alert("Invalid file format!");
+        const imported = JSON.parse(event.target.result);
+
+        // Validate structure
+        if (
+          imported &&
+          imported.sources &&
+          imported.toBePaid &&
+          imported.paid
+        ) {
+          data = imported;
+          localStorage.setItem("budgetData", JSON.stringify(data));
+          renderAll();
+          calculateTotals();
+          alert("✅ Data imported successfully!");
+        } else {
+          alert("❌ Invalid JSON format!");
+        }
+      } catch (err) {
+        console.error(err);
+        alert("❌ Error reading file!");
       }
     };
     reader.readAsText(file);

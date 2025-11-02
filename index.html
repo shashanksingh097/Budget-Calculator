@@ -1,56 +1,221 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>💰 Budget Calculator</title>
-  <link rel="stylesheet" href="style.css" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Budget Calculator — v3</title>
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#fff; --accent:#0ea5e9; --muted:#6b7280;
+    --danger:#ef4444; --ok:#10b981;
+  }
+  body{
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:var(--bg); margin:0; padding:24px; color:#0f172a;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  .app { width:100%; max-width:1000px; }
+  header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px;}
+  h1{ font-size:20px; margin:0; color:#0f172a;}
+  .controls{ display:flex; gap:8px; align-items:center;}
+  button{ background:var(--accent); color:white; padding:8px 12px; border:0; border-radius:8px; cursor:pointer;}
+  button.ghost{ background:transparent; color:var(--accent); border:1px solid rgba(14,165,233,0.16); }
+  .card{ background:var(--card); border-radius:10px; padding:14px; box-shadow:0 6px 18px rgba(2,6,23,0.06); margin-bottom:14px;}
+  table{ width:100%; border-collapse:collapse; font-size:14px; }
+  th, td{ padding:8px 10px; border-bottom:1px solid #eef2f7; text-align:left; vertical-align:middle; }
+  thead th{ background:#f1f9ff; color:#034f6b; font-weight:600; }
+  td.center{ text-align:center; }
+  input[type="number"]{ width:110px; padding:6px 8px; border-radius:6px; border:1px solid #e2e8f0; }
+  input.paidInput{ width:100px; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; }
+  .muted{ color:var(--muted); font-size:13px; }
+  .totals{ display:flex; gap:12px; flex-wrap:wrap; margin-top:10px; }
+  .tile{ padding:10px 12px; border-radius:8px; background:#f8fbff; min-width:160px; text-align:left; }
+  .tile .num{ font-weight:700; font-size:16px; margin-top:6px;}
+  .danger{ color:var(--danger); font-weight:700; }
+  .ok{ color:var(--ok); font-weight:700; }
+  .actions button{ margin-right:6px; }
+  .small{ font-size:13px; padding:6px 10px; border-radius:8px;}
+  .row-date{ color:var(--muted); font-size:13px; }
+  .empty{ text-align:center; color:var(--muted); padding:18px 0;}
+  .inline-btn { margin-left:6px; padding:6px 8px; font-size:13px; border-radius:6px; cursor:pointer; }
+  .inline-edit { background:#fff; border:1px solid #cbd5e1; color:#0f172a; }
+  .inline-save { background:#10b981; color:white; border:0; }
+  .inline-cancel { background:#ef4444; color:white; border:0; }
+  .overlay{ display:none; position:fixed; inset:0; background:rgba(2,6,23,0.4); z-index:40; }
+  .modal{ display:none; position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); background:white; padding:16px; border-radius:10px; z-index:50; width:90%; max-width:720px; box-shadow:0 12px 40px rgba(2,6,23,0.25); }
+  pre.jsonPreview{ max-height:320px; overflow:auto; background:#0f172a; color:#fff; padding:12px; border-radius:8px; font-size:13px; }
+  @media(max-width:880px){ table{ font-size:13px; } input[type="number"]{ width:90px; } }
+</style>
 </head>
 <body>
-  <h1>💰 Budget Calculator</h1>
+<div class="app">
+  <header>
+    <h1>Budget Calculator — v3</h1>
+    <div class="controls">
+      <button onclick="openForm()">+ Add Entry</button>
+      <button class="ghost small" onclick="exportJSON()">Export JSON</button>
+      <button class="ghost small" onclick="triggerImport()">Import JSON</button>
+      <button onclick="saveToStorage()">Save Data</button>
+    </div>
+  </header>
 
-  <div class="controls">
-    <button onclick="openForm('source')">+ Add Source</button>
-    <button onclick="openForm('tobepaid')">+ Add To-Be-Paid</button>
-    <button onclick="openForm('paid')">+ Add Paid</button>
-    <button onclick="exportData()">📤 Export</button>
-    <button onclick="importData()">📥 Import</button>
-  </div>
-
-  <div class="section">
-    <h2>Source of Money</h2>
-    <ul id="source-list"></ul>
-  </div>
-
-  <div class="section">
-    <h2>To Be Paid</h2>
-    <ul id="tobepaid-list"></ul>
-  </div>
-
-  <div class="section">
-    <h2>Paid</h2>
-    <ul id="paid-list"></ul>
-  </div>
-
-  <div class="summary">
-    <h2>Summary</h2>
-    <p>Total Money Available: <span id="total-source">0</span></p>
-    <p>Total To Be Paid: <span id="total-tobepaid">0</span></p>
-    <p>Total Paid: <span id="total-paid">0</span></p>
-    <h3>Remaining Balance: <span id="remaining">0</span></h3>
-  </div>
-
-  <!-- Modal -->
-  <div id="modal" class="modal">
-    <div class="modal-content">
-      <h3 id="modal-title"></h3>
-      <input type="text" id="entry-name" placeholder="Name" />
-      <input type="number" id="entry-amount" placeholder="Amount" />
-      <button onclick="saveEntry()">Save</button>
-      <button onclick="closeForm()">Cancel</button>
+  <div class="card">
+    <table id="budgetTable">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Source (name)</th>
+          <th>Source Amt</th>
+          <th>To Be Paid</th>
+          <th>To Amt</th>
+          <th>Paid</th>
+          <th>Remaining</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div id="emptyMsg" class="empty">No entries yet. Click "Add Entry" to create one.</div>
+    <div class="totals">
+      <div class="tile"><div class="muted">Total Source</div><div id="totalSource" class="num">0</div></div>
+      <div class="tile"><div class="muted">Total To-Be-Paid</div><div id="totalToBe" class="num">0</div></div>
+      <div class="tile"><div class="muted">Total Paid</div><div id="totalPaid" class="num">0</div></div>
+      <div class="tile"><div class="muted">Total Remaining</div><div id="totalRemaining" class="num danger">0</div></div>
+      <div class="tile"><div class="muted">Balance (Source - Paid)</div><div id="currentBalance" class="num ok">0</div></div>
     </div>
   </div>
+</div>
 
-  <script src="script.js"></script>
+<!-- overlay & modals -->
+<div id="overlay" class="overlay"></div>
+
+<!-- add form -->
+<div id="form" class="modal">
+  <h3>Add New Entry</h3>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div><label class="muted">Source</label><br><input id="f_sourceName" type="text"></div>
+    <div><label class="muted">Amt</label><br><input id="f_sourceAmt" type="number" min="0" value="0"></div>
+    <div><label class="muted">To</label><br><input id="f_toName" type="text"></div>
+    <div><label class="muted">Amt</label><br><input id="f_toAmt" type="number" min="0" value="0"></div>
+    <div><label class="muted">Date</label><br><input id="f_date" type="date"></div>
+  </div>
+  <div style="text-align:right;margin-top:10px;">
+    <button onclick="saveEntry()">Add</button>
+    <button class="ghost" onclick="closeForm()">Cancel</button>
+  </div>
+</div>
+
+<!-- import modal -->
+<div id="importModal" class="modal">
+  <h3>Import Preview</h3>
+  <pre id="preview" class="jsonPreview"></pre>
+  <div style="text-align:right;margin-top:10px;">
+    <button class="ghost" onclick="cancelImport()">Cancel</button>
+    <button class="inline-save" onclick="applyImport()">Apply Import</button>
+  </div>
+</div>
+
+<script>
+let data = JSON.parse(localStorage.getItem('budget_v3')) || [];
+let importedData = null;
+const tbody=document.querySelector("#budgetTable tbody");
+const emptyMsg=document.getElementById('emptyMsg');
+const overlay=document.getElementById('overlay');
+const form=document.getElementById('form');
+const importModal=document.getElementById('importModal');
+const previewEl=document.getElementById('preview');
+
+function formatNum(n){return (Number(n)||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});}
+function escapeHtml(str){return String(str).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+
+function render(){
+  tbody.innerHTML="";
+  if(data.length===0){emptyMsg.style.display="block";return;} else emptyMsg.style.display="none";
+  let totalSource=0,totalToBe=0,totalPaid=0;
+  data.forEach((r,i)=>{
+    totalSource+=+r.sourceAmt; totalToBe+=+r.toAmt; totalPaid+=+r.paid;
+    const rem=(r.toAmt - r.paid).toFixed(2);
+    tbody.innerHTML+=`
+      <tr>
+        <td>${r.date||''}</td>
+        <td>${escapeHtml(r.sourceName||'')}</td>
+        <td>${formatNum(r.sourceAmt)}</td>
+        <td>${escapeHtml(r.toName||'')}</td>
+        <td>${formatNum(r.toAmt)}</td>
+        <td class="center"><span>${formatNum(r.paid)}</span> <button class="inline-btn inline-edit" onclick="editPaid(${i})">Edit</button></td>
+        <td>${formatNum(rem)}</td>
+        <td class="center"><button class="small" onclick="deleteRow(${i})" style="background:#ffecec;color:#ef4444;">Delete</button></td>
+      </tr>`;
+  });
+  document.getElementById('totalSource').innerText=formatNum(totalSource);
+  document.getElementById('totalToBe').innerText=formatNum(totalToBe);
+  document.getElementById('totalPaid').innerText=formatNum(totalPaid);
+  document.getElementById('totalRemaining').innerText=formatNum(totalToBe-totalPaid);
+  document.getElementById('currentBalance').innerText=formatNum(totalSource-totalPaid);
+}
+
+function editPaid(i){
+  const row=data[i];
+  const val=prompt("Enter new Paid value:",row.paid||0);
+  if(val===null)return;
+  row.paid=Number(val)||0;
+  saveToStorage(); render();
+}
+function deleteRow(i){if(confirm("Delete this entry?")){data.splice(i,1);saveToStorage();render();}}
+function openForm(){overlay.style.display=form.style.display='block';document.getElementById('f_date').value=new Date().toISOString().slice(0,10);}
+function closeForm(){overlay.style.display=form.style.display='none';}
+function saveEntry(){
+  data.push({
+    date:document.getElementById('f_date').value,
+    sourceName:document.getElementById('f_sourceName').value.trim(),
+    sourceAmt:+document.getElementById('f_sourceAmt').value||0,
+    toName:document.getElementById('f_toName').value.trim(),
+    toAmt:+document.getElementById('f_toAmt').value||0,
+    paid:0
+  });
+  saveToStorage(); closeForm(); render();
+}
+function saveToStorage(){localStorage.setItem('budget_v3',JSON.stringify(data));flash('Saved');}
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');
+  a.href=url;a.download='budget_export.json';a.click();URL.revokeObjectURL(url);
+}
+function triggerImport(){
+  const input=document.createElement('input');
+  input.type='file';input.accept='application/json';
+  input.onchange=e=>{
+    const file=e.target.files[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=()=>{
+      try{
+        const parsed=JSON.parse(reader.result);
+        if(!Array.isArray(parsed))throw new Error("Invalid JSON");
+        importedData=parsed;
+        previewEl.textContent=JSON.stringify(importedData,null,2);
+        overlay.style.display=importModal.style.display='block';
+      }catch(err){alert("Invalid JSON: "+err.message);}
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+function cancelImport(){importedData=null;overlay.style.display=importModal.style.display='none';}
+function applyImport(){
+  if(!importedData)return;
+  if(confirm("Replace current data?")){
+    data=importedData; saveToStorage();
+    overlay.style.display=importModal.style.display='none';
+    render(); // ✅ immediate refresh fixed
+  }
+}
+function flash(msg){
+  let el=document.getElementById('flash');
+  if(!el){el=document.createElement('div');el.id='flash';
+  el.style.cssText='position:fixed;bottom:16px;right:16px;background:#0f172a;color:#fff;padding:8px 12px;border-radius:8px;';document.body.appendChild(el);}
+  el.textContent=msg;el.style.opacity='1';setTimeout(()=>el.style.opacity='0',1200);
+}
+render();
+</script>
 </body>
 </html>
